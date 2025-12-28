@@ -13,6 +13,7 @@ class EmployeeLoginScreen extends StatefulWidget {
 
 class EmployeeLoginScreenState extends State<EmployeeLoginScreen> {
   final LocalStorageService _localStorageService = LocalStorageService();
+  String? _selectedEmployeeId;
 
   @override
   void initState() {
@@ -23,6 +24,9 @@ class EmployeeLoginScreenState extends State<EmployeeLoginScreen> {
   }
 
   void _onEmployeeSelected(Employee employee) {
+    setState(() {
+      _selectedEmployeeId = employee.id;
+    });
     _showPasswordDialog(employee);
   }
 
@@ -80,7 +84,11 @@ class EmployeeLoginScreenState extends State<EmployeeLoginScreen> {
           ],
         );
       },
-    );
+    ).then((_) {
+      setState(() {
+        _selectedEmployeeId = null;
+      });
+    });
   }
 
   @override
@@ -97,17 +105,72 @@ class EmployeeLoginScreenState extends State<EmployeeLoginScreen> {
             return Center(child: Text('No employees found.'));
           }
 
-          return ListView.builder(
+          return GridView.builder(
+            padding: const EdgeInsets.all(16.0),
+            gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+              crossAxisCount: 3,
+              crossAxisSpacing: 16.0,
+              mainAxisSpacing: 16.0,
+              childAspectRatio: 0.8,
+            ),
             itemCount: provider.employees.length,
             itemBuilder: (context, index) {
               final employee = provider.employees[index];
-              return ListTile(
-                title: Text(employee.name),
+              return _EmployeeGridItem(
+                employee: employee,
+                isSelected: _selectedEmployeeId == employee.id,
                 onTap: () => _onEmployeeSelected(employee),
               );
             },
           );
         },
+      ),
+    );
+  }
+}
+
+class _EmployeeGridItem extends StatelessWidget {
+  final Employee employee;
+  final bool isSelected;
+  final VoidCallback onTap;
+
+  const _EmployeeGridItem({
+    required this.employee,
+    required this.isSelected,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: isSelected ? Colors.blue.withOpacity(0.2) : Colors.transparent,
+      borderRadius: BorderRadius.circular(12.0),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(12.0),
+        child: Container(
+          decoration: BoxDecoration(
+            border: Border.all(
+              color: isSelected ? Colors.blue : Colors.grey.withOpacity(0.5),
+              width: isSelected ? 2.0 : 1.0,
+            ),
+            borderRadius: BorderRadius.circular(12.0),
+          ),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(Icons.person, size: 48.0, color: Theme.of(context).primaryColor),
+              SizedBox(height: 8.0),
+              Text(
+                employee.name,
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }
