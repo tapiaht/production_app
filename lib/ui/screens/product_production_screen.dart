@@ -1,14 +1,16 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:production_app/models/category.dart';
+import 'package:production_app/models/employee.dart';
 import 'package:production_app/providers/product_provider.dart';
 import 'package:production_app/providers/production_provider.dart';
+import 'package:production_app/ui/widgets/status_bar.dart';
 
 class ProductProductionScreen extends StatefulWidget {
-  final String employeeId;
+  final Employee employee;
   final Category category;
 
-  const ProductProductionScreen({super.key, required this.employeeId, required this.category});
+  const ProductProductionScreen({super.key, required this.employee, required this.category});
 
   @override
   ProductProductionScreenState createState() => ProductProductionScreenState();
@@ -16,6 +18,15 @@ class ProductProductionScreen extends StatefulWidget {
 
 class ProductProductionScreenState extends State<ProductProductionScreen> {
   final Map<String, int> quantities = {};
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      Provider.of<ProductionProvider>(context, listen: false)
+          .getTodaysProductionCount(widget.employee.id);
+    });
+  }
 
   void _saveProduction(BuildContext context) async {
     final scaffoldMessenger = ScaffoldMessenger.of(context);
@@ -31,7 +42,7 @@ class ProductProductionScreenState extends State<ProductProductionScreen> {
     final productionProvider = Provider.of<ProductionProvider>(context, listen: false);
 
     try {
-      await productionProvider.saveProduction(widget.employeeId, quantities);
+      await productionProvider.saveProduction(widget.employee.id, quantities);
       
       scaffoldMessenger.showSnackBar(
         SnackBar(content: Text('Production saved successfully!')),
@@ -53,28 +64,42 @@ class ProductProductionScreenState extends State<ProductProductionScreen> {
 
     return Scaffold(
       appBar: AppBar(title: Text(widget.category.name)),
-      body: Consumer<ProductProvider>(
-        builder: (_, provider, _) { // Changed __ to _
-          if (provider.products.isEmpty) {
-            return Center(child: Text('No products found for this category.'));
-          }
-          return ListView(
-            children: provider.products.map((p) {
-              return ListTile(
-                title: Text(p.name),
-                trailing: SizedBox(
-                  width: 80,
-                  child: TextField(
-                    keyboardType: TextInputType.number,
-                    onChanged: (v) {
-                      quantities[p.id] = int.tryParse(v) ?? 0;
-                    },
-                  ),
-                ),
+      body: Column(
+        children: [
+          Consumer<ProductionProvider>(
+            builder: (context, productionProvider, child) {
+              return StatusBar(
+                employeeName: widget.employee.name,
+                productionCount: productionProvider.productionCount,
               );
-            }).toList(),
-          );
-        },
+            },
+          ),
+          Expanded(
+            child: Consumer<ProductProvider>(
+              builder: (_, provider, _) { // Changed __ to _
+                if (provider.products.isEmpty) {
+                  return Center(child: Text('No products found for this category.'));
+                }
+                return ListView(
+                  children: provider.products.map((p) {
+                    return ListTile(
+                      title: Text(p.name),
+                      trailing: SizedBox(
+                        width: 80,
+                        child: TextField(
+                          keyboardType: TextInputType.number,
+                          onChanged: (v) {
+                            quantities[p.id] = int.tryParse(v) ?? 0;
+                          },
+                        ),
+                      ),
+                    );
+                  }).toList(),
+                );
+              },
+            ),
+          ),
+        ],
       ),
       floatingActionButton: Consumer<ProductionProvider>(
         builder: (context, productionProvider, _) { // Changed child to _

@@ -154,6 +154,28 @@ class SheetsService {
       valueInputOption: 'RAW',
     );
   }
+
+  Future<int> getTodaysProductionCount(String employeeId) async {
+    final client = await getClient();
+    final api = SheetsApi(client);
+    final date = today();
+
+    final response = await api.spreadsheets.values.get(
+      spreadsheetId,
+      'PRODUCTION!A2:D',
+    );
+
+    if (response.values == null) {
+      return 0;
+    }
+
+    return response.values!
+        .where((row) =>
+            row.length > 1 &&
+            row[0].toString() == date &&
+            row[1].toString() == employeeId)
+        .length;
+  }
 }
 
 String today() {

@@ -17,4 +17,12 @@ class EmployeeProvider extends ChangeNotifier {
     loading = false;
     notifyListeners();
   }
+
+  Employee? getEmployeeById(String id) {
+    try {
+      return employees.firstWhere((employee) => employee.id == id);
+    } catch (e) {
+      return null;
+    }
+  }
 }

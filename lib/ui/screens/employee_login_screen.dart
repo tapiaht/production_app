@@ -143,7 +143,7 @@ class _EmployeeGridItem extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Material(
-      color: isSelected ? Colors.blue.withOpacity(0.2) : Colors.transparent,
+      color: isSelected ? Color.fromARGB(51, 33, 150, 243) : Colors.transparent,
       borderRadius: BorderRadius.circular(12.0),
       child: InkWell(
         onTap: onTap,
@@ -151,7 +151,7 @@ class _EmployeeGridItem extends StatelessWidget {
         child: Container(
           decoration: BoxDecoration(
             border: Border.all(
-              color: isSelected ? Colors.blue : Colors.grey.withOpacity(0.5),
+              color: isSelected ? Colors.blue : Color.fromARGB(128, 158, 158, 158),
               width: isSelected ? 2.0 : 1.0,
             ),
             borderRadius: BorderRadius.circular(12.0),
