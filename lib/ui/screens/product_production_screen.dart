@@ -2,49 +2,47 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:production_app/models/category.dart';
 import 'package:production_app/providers/product_provider.dart';
-import 'package:production_app/services/sheets_service.dart'; // Import SheetsService
+import 'package:production_app/providers/production_provider.dart';
 
 class ProductProductionScreen extends StatefulWidget {
   final String employeeId;
   final Category category;
 
-  ProductProductionScreen({required this.employeeId, required this.category});
+  const ProductProductionScreen({super.key, required this.employeeId, required this.category});
 
   @override
-  _ProductProductionScreenState createState() => _ProductProductionScreenState();
+  ProductProductionScreenState createState() => ProductProductionScreenState();
 }
 
-class _ProductProductionScreenState extends State<ProductProductionScreen> {
+class ProductProductionScreenState extends State<ProductProductionScreen> {
   final Map<String, int> quantities = {};
-  bool _isSaving = false;
 
-  void _saveProduction() async {
+  void _saveProduction(BuildContext context) async {
+    final scaffoldMessenger = ScaffoldMessenger.of(context);
+    final navigator = Navigator.of(context);
     if (quantities.isEmpty || quantities.values.every((qty) => qty == 0)) {
-      ScaffoldMessenger.of(context).showSnackBar(
+      
+      scaffoldMessenger.showSnackBar(
         SnackBar(content: Text('Please enter quantities for at least one product.')),
       );
       return;
     }
 
-    setState(() {
-      _isSaving = true;
-    });
+    final productionProvider = Provider.of<ProductionProvider>(context, listen: false);
 
     try {
-      final sheetsService = Provider.of<SheetsService>(context, listen: false); // Access SheetsService
-      await sheetsService.saveProductionBatch(widget.employeeId, quantities);
-      ScaffoldMessenger.of(context).showSnackBar(
+      await productionProvider.saveProduction(widget.employeeId, quantities);
+      
+      scaffoldMessenger.showSnackBar(
         SnackBar(content: Text('Production saved successfully!')),
       );
-      Navigator.pop(context); // Go back after saving
+      
+      navigator.pop(); // Go back after saving
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
+      
+      scaffoldMessenger.showSnackBar(
         SnackBar(content: Text('Failed to save production: $e')),
       );
-    } finally {
-      setState(() {
-        _isSaving = false;
-      });
     }
   }
 
@@ -56,7 +54,7 @@ class _ProductProductionScreenState extends State<ProductProductionScreen> {
     return Scaffold(
       appBar: AppBar(title: Text(widget.category.name)),
       body: Consumer<ProductProvider>(
-        builder: (_, provider, __) {
+        builder: (_, provider, _) { // Changed __ to _
           if (provider.products.isEmpty) {
             return Center(child: Text('No products found for this category.'));
           }
@@ -78,12 +76,16 @@ class _ProductProductionScreenState extends State<ProductProductionScreen> {
           );
         },
       ),
-      floatingActionButton: _isSaving
-          ? CircularProgressIndicator()
-          : FloatingActionButton(
-              child: Icon(Icons.save),
-              onPressed: _saveProduction,
-            ),
+      floatingActionButton: Consumer<ProductionProvider>(
+        builder: (context, productionProvider, _) { // Changed child to _
+          return productionProvider.loading
+              ? CircularProgressIndicator()
+              : FloatingActionButton(
+                  child: Icon(Icons.save),
+                  onPressed: () => _saveProduction(context),
+                );
+        },
+      ),
     );
   }
 }

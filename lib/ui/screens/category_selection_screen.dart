@@ -1,19 +1,18 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'package:production_app/models/category.dart';
 import 'package:production_app/providers/category_provider.dart';
 import 'package:production_app/ui/screens/product_production_screen.dart';
 
 class CategorySelectionScreen extends StatefulWidget {
   final String employeeId;
 
-  CategorySelectionScreen({required this.employeeId});
+  const CategorySelectionScreen({super.key, required this.employeeId});
 
   @override
-  _CategorySelectionScreenState createState() => _CategorySelectionScreenState();
+  State<CategorySelectionScreen> createState() => CategorySelectionScreenState();
 }
 
-class _CategorySelectionScreenState extends State<CategorySelectionScreen> {
+class CategorySelectionScreenState extends State<CategorySelectionScreen> {
   @override
   void initState() {
     super.initState();
@@ -28,7 +27,7 @@ class _CategorySelectionScreenState extends State<CategorySelectionScreen> {
     return Scaffold(
       appBar: AppBar(title: Text('Select Category')),
       body: Consumer<CategoryProvider>(
-        builder: (_, provider, __) {
+        builder: (_, provider, _) { // Changed __ to _
           if (provider.loading) {
             return Center(child: CircularProgressIndicator());
           }

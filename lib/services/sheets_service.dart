@@ -66,16 +66,19 @@ class SheetsService {
 
     final response = await api.spreadsheets.values.get(
       spreadsheetId,
-      'EMPLOYEES!A2:B',
+      'EMPLOYEES!A2:C',
     );
 
     if (response.values == null || response.values!.isEmpty) {
       return [];
     }
 
-    return response.values!.map((row) => Employee(
-      id: row[0].toString(),
-      name: row[1].toString(),
+    return response.values!
+      .where((row) => row.length > 2)
+      .map((row) => Employee(
+        id: row[0].toString(),
+        name: row[1].toString(),
+        password: row[2].toString(),
     )).toList();
   }
 

@@ -1,24 +1,23 @@
-Future<void> insertProduction(
-String employeeId,
-String productId,
-int quantity,
-) async {
-final client = await getClient();
-final sheetsApi = SheetsApi(client);
+import 'package:flutter/material.dart';
+import 'package:production_app/services/sheets_service.dart';
 
+class ProductionProvider extends ChangeNotifier {
+  final SheetsService service;
+  bool _loading = false;
 
-final valueRange = ValueRange(values: [[
-DateTime.now().toIso8601String(),
-employeeId,
-productId,
-quantity
-]]);
+  ProductionProvider(this.service);
 
+  bool get loading => _loading;
 
-await sheetsApi.spreadsheets.values.append(
-valueRange,
-spreadsheetId,
-'PRODUCTION!A:D',
-valueInputOption: 'RAW',
-);
+  Future<void> saveProduction(String employeeId, Map<String, int> quantities) async {
+    _loading = true;
+    notifyListeners();
+
+    try {
+      await service.saveProductionBatch(employeeId, quantities);
+    } finally {
+      _loading = false;
+      notifyListeners();
+    }
+  }
 }
