@@ -105,29 +105,86 @@ class SheetsService {
         .toList();
   }
 
-  Future<bool> productionExists(
-    String date,
+  Future<int?> findProductionRecordRow(
     String employeeId,
     String productId,
+    String date,
   ) async {
     final client = await getClient();
     final api = SheetsApi(client);
 
     final response = await api.spreadsheets.values.get(
       spreadsheetId,
-      'PRODUCTION!A2:D',
+      'PRODUCTION!A:D',
     );
 
     if (response.values == null) {
-      return false;
+      return null;
     }
 
-    return response.values!.any((row) =>
-      row.length > 2 && // Ensure there are enough columns to compare
-      row[0].toString() == date &&
-      row[1].toString() == employeeId &&
-      row[2].toString() == productId
+    // +1 for 0-based index to 1-based row number
+    // +1 because the header row is not included in the values
+    for (int i = 0; i < response.values!.length; i++) {
+      final row = response.values![i];
+      if (row.length > 2 &&
+          row[0].toString() == date &&
+          row[1].toString() == employeeId &&
+          row[2].toString() == productId) {
+        return i + 2; // +2 because sheets are 1-indexed and has a header row
+      }
+    }
+    return null;
+  }
+
+  Future<void> updateProductionRecord(
+    int rowIndex,
+    String employeeId,
+    String productId,
+    int newQuantity,
+  ) async {
+    final client = await getClient();
+    final sheetsApi = SheetsApi(client);
+    final date = today();
+
+    final valueRange = ValueRange(values: [
+      [date, employeeId, productId, newQuantity]
+    ]);
+
+    await sheetsApi.spreadsheets.values.update(
+      valueRange,
+      spreadsheetId,
+      'PRODUCTION!A$rowIndex:D$rowIndex',
+      valueInputOption: 'RAW',
     );
+  }
+
+  Future<Map<String, int>> fetchAllProductionRecords(
+    String employeeId,
+    String date,
+  ) async {
+    final client = await getClient();
+    final api = SheetsApi(client);
+
+    final response = await api.spreadsheets.values.get(
+      spreadsheetId,
+      'PRODUCTION!A:D',
+    );
+
+    if (response.values == null) {
+      return {};
+    }
+
+    final Map<String, int> records = {};
+    for (final row in response.values!) {
+      if (row.length > 3 &&
+          row[0].toString() == date &&
+          row[1].toString() == employeeId) {
+        final productId = row[2].toString();
+        final quantity = int.tryParse(row[3].toString()) ?? 0;
+        records[productId] = quantity;
+      }
+    }
+    return records;
   }
 
   Future<void> saveProductionBatch(
@@ -138,21 +195,31 @@ class SheetsService {
     final api = SheetsApi(client);
     final date = today();
 
-    final rows = quantities.entries.map((e) => [
-      date,
-      employeeId,
-      e.key,
-      e.value
-    ]).toList();
+    final List<List<Object>> rowsToAppend = [];
 
-    final body = ValueRange(values: rows);
+    for (final entry in quantities.entries) {
+      final productId = entry.key;
+      final quantity = entry.value;
 
-    await api.spreadsheets.values.append(
-      body,
-      spreadsheetId,
-      'PRODUCTION!A:D',
-      valueInputOption: 'RAW',
-    );
+      final rowIndex =
+          await findProductionRecordRow(employeeId, productId, date);
+
+      if (rowIndex != null) {
+        await updateProductionRecord(rowIndex, employeeId, productId, quantity);
+      } else {
+        rowsToAppend.add([date, employeeId, productId, quantity]);
+      }
+    }
+
+    if (rowsToAppend.isNotEmpty) {
+      final body = ValueRange(values: rowsToAppend);
+      await api.spreadsheets.values.append(
+        body,
+        spreadsheetId,
+        'PRODUCTION!A:D',
+        valueInputOption: 'RAW',
+      );
+    }
   }
 
   Future<int> getTodaysProductionCount(String employeeId) async {

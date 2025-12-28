@@ -17,22 +17,54 @@ class ProductProductionScreen extends StatefulWidget {
 }
 
 class ProductProductionScreenState extends State<ProductProductionScreen> {
+  final Map<String, TextEditingController> _controllers = {};
   final Map<String, int> quantities = {};
+  bool _isDataLoaded = false; // Add a flag to track data loading
 
   @override
   void initState() {
     super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      Provider.of<ProductionProvider>(context, listen: false)
-          .getTodaysProductionCount(widget.employee.id);
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      final productProvider = Provider.of<ProductProvider>(context, listen: false);
+      final productionProvider = Provider.of<ProductionProvider>(context, listen: false);
+
+      // Load products first
+      await productProvider.loadProducts(widget.category.id);
+
+      // Then load production records
+      await productionProvider.loadProductionRecords(widget.employee.id);
+
+      // After loading both, initialize quantities and controllers
+      final productionRecords = productionProvider.productionRecords;
+      for (var product in productProvider.products) {
+        final initialQuantity = productionRecords[product.id] ?? 0;
+        quantities[product.id] = initialQuantity;
+        _controllers[product.id] = TextEditingController(text: initialQuantity == 0 ? '' : initialQuantity.toString());
+      }
+      
+      // Finally, load today's production count
+      await productionProvider.getTodaysProductionCount(widget.employee.id);
+
+      // Set flag and trigger a rebuild to update the UI with pre-filled text fields
+      setState(() {
+        _isDataLoaded = true;
+      });
     });
+  }
+
+  @override
+  void dispose() {
+    _controllers.forEach((key, controller) => controller.dispose());
+    super.dispose();
   }
 
   void _saveProduction(BuildContext context) async {
     final scaffoldMessenger = ScaffoldMessenger.of(context);
     final navigator = Navigator.of(context);
-    if (quantities.isEmpty || quantities.values.every((qty) => qty == 0)) {
-      
+    // Filter out products with 0 quantity or empty input
+    final quantitiesToSave = Map<String, int>.from(quantities)..removeWhere((key, value) => value == 0);
+
+    if (quantitiesToSave.isEmpty) {
       scaffoldMessenger.showSnackBar(
         SnackBar(content: Text('Please enter quantities for at least one product.')),
       );
@@ -42,7 +74,7 @@ class ProductProductionScreenState extends State<ProductProductionScreen> {
     final productionProvider = Provider.of<ProductionProvider>(context, listen: false);
 
     try {
-      await productionProvider.saveProduction(widget.employee.id, quantities);
+      await productionProvider.saveProduction(widget.employee.id, quantitiesToSave);
       
       scaffoldMessenger.showSnackBar(
         SnackBar(content: Text('Production saved successfully!')),
@@ -59,9 +91,7 @@ class ProductProductionScreenState extends State<ProductProductionScreen> {
 
   @override
   Widget build(BuildContext context) {
-    context.read<ProductProvider>()
-      .loadProducts(widget.category.id);
-
+    // Moved loadProducts to initState to prevent setState() during build error.
     return Scaffold(
       appBar: AppBar(title: Text(widget.category.name)),
       body: Column(
@@ -77,24 +107,36 @@ class ProductProductionScreenState extends State<ProductProductionScreen> {
           Expanded(
             child: Consumer<ProductProvider>(
               builder: (_, provider, _) { // Changed __ to _
+                if (provider.loading || !_isDataLoaded) { // Check _isDataLoaded as well
+                  return Center(child: CircularProgressIndicator());
+                }
                 if (provider.products.isEmpty) {
                   return Center(child: Text('No products found for this category.'));
                 }
-                return ListView(
-                  children: provider.products.map((p) {
+                return ListView.builder(
+                  itemCount: provider.products.length,
+                  itemBuilder: (context, index) {
+                    final product = provider.products[index];
+                    // Retrieve pre-initialized controller
+                    final controller = _controllers[product.id]; 
+                    
                     return ListTile(
-                      title: Text(p.name),
+                      title: Text(product.name),
                       trailing: SizedBox(
                         width: 80,
                         child: TextField(
+                          controller: controller, // Use the pre-initialized controller
                           keyboardType: TextInputType.number,
+                          decoration: InputDecoration(
+                            hintText: 'Qty',
+                          ),
                           onChanged: (v) {
-                            quantities[p.id] = int.tryParse(v) ?? 0;
+                            quantities[product.id] = int.tryParse(v) ?? 0;
                           },
                         ),
                       ),
                     );
-                  }).toList(),
+                  },
                 );
               },
             ),
