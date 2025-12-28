@@ -27,7 +27,7 @@ class SheetsService {
     final sheetsApi = SheetsApi(client);
 
     final valueRange = ValueRange(values: [[
-      DateTime.now().toIso8601String(),
+      today(),
       employeeId,
       productId,
       quantity
