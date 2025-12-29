@@ -1,26 +1,27 @@
 import 'package:flutter/material.dart';
 import 'package:production_app/services/sheets_service.dart';
+import 'package:production_app/models/production.dart'; // Import Production model
 
 class ProductionProvider extends ChangeNotifier {
   final SheetsService service;
   bool _loading = false;
   int _productionCount = 0;
-  Map<String, int> _productionRecords = {};
+  List<Production> _productionRecords = []; // Changed to List<Production>
 
   ProductionProvider(this.service);
 
   bool get loading => _loading;
   int get productionCount => _productionCount;
-  Map<String, int> get productionRecords => _productionRecords;
+  List<Production> get productionRecords => _productionRecords; // Changed getter
 
-  Future<void> saveProduction(String employeeId, Map<String, int> quantities) async {
+  Future<void> saveProduction(String employeeId, Map<String, Map<String, dynamic>> productionData) async {
     _loading = true;
     _productionCount = 0;
-    _productionRecords = {};
+    _productionRecords = []; // Cleared the list
     notifyListeners();
 
     try {
-      await service.saveProductionBatch(employeeId, quantities);
+      await service.saveProductionBatch(employeeId, productionData);
     } finally {
       _loading = false;
       notifyListeners();
@@ -42,10 +43,11 @@ class ProductionProvider extends ChangeNotifier {
     _loading = true;
     notifyListeners();
     try {
-      _productionRecords = await service.fetchAllProductionRecords(employeeId, today());
+      _productionRecords = await service.fetchAllProductionRecords(employeeId, today()); // Fetches List<Production>
     } finally {
       _loading = false;
       notifyListeners();
     }
   }
 }
+

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:production_app/models/category.dart';
 import 'package:production_app/models/employee.dart';
+import 'package:production_app/models/production.dart'; // Import Production model
 import 'package:production_app/providers/product_provider.dart';
 import 'package:production_app/providers/production_provider.dart';
 import 'package:production_app/ui/widgets/status_bar.dart';
@@ -19,6 +20,7 @@ class ProductProductionScreen extends StatefulWidget {
 class ProductProductionScreenState extends State<ProductProductionScreen> {
   final Map<String, TextEditingController> _controllers = {};
   final Map<String, int> quantities = {};
+  Map<String, Production> _existingProductionRecords = {};
   bool _isDataLoaded = false; // Add a flag to track data loading
 
   @override
@@ -35,9 +37,14 @@ class ProductProductionScreenState extends State<ProductProductionScreen> {
       await productionProvider.loadProductionRecords(widget.employee.id);
 
       // After loading both, initialize quantities and controllers
-      final productionRecords = productionProvider.productionRecords;
+      final List<Production> productionRecordsList = productionProvider.productionRecords; // Get the list
+      _existingProductionRecords = { // Populate the map of existing records
+        for (var record in productionRecordsList) record.productId: record
+      };
+
       for (var product in productProvider.products) {
-        final initialQuantity = productionRecords[product.id] ?? 0;
+        final existingRecord = _existingProductionRecords[product.id];
+        final initialQuantity = existingRecord?.quantity ?? 0;
         quantities[product.id] = initialQuantity;
         _controllers[product.id] = TextEditingController(text: initialQuantity == 0 ? '' : initialQuantity.toString());
       }
@@ -71,10 +78,21 @@ class ProductProductionScreenState extends State<ProductProductionScreen> {
       return;
     }
 
+    final productionData = <String, Map<String, dynamic>>{};
+    for (var entry in quantitiesToSave.entries) {
+      final productId = entry.key;
+      final quantity = entry.value;
+      final existingRecord = _existingProductionRecords[productId];
+      productionData[productId] = {
+        'quantity': quantity,
+        'productionId': existingRecord?.productionId,
+      };
+    }
+
     final productionProvider = Provider.of<ProductionProvider>(context, listen: false);
 
     try {
-      await productionProvider.saveProduction(widget.employee.id, quantitiesToSave);
+      await productionProvider.saveProduction(widget.employee.id, productionData);
       
       scaffoldMessenger.showSnackBar(
         SnackBar(content: Text('Production saved successfully!')),
@@ -123,16 +141,25 @@ class ProductProductionScreenState extends State<ProductProductionScreen> {
                     return ListTile(
                       title: Text(product.name),
                       trailing: SizedBox(
-                        width: 80,
-                        child: TextField(
-                          controller: controller, // Use the pre-initialized controller
-                          keyboardType: TextInputType.number,
-                          decoration: InputDecoration(
-                            hintText: 'Qty',
-                          ),
-                          onChanged: (v) {
-                            quantities[product.id] = int.tryParse(v) ?? 0;
-                          },
+                        width: 120, // Increased width to accommodate both TextField and Text
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Expanded(
+                              child: TextField(
+                                controller: controller, // Use the pre-initialized controller
+                                keyboardType: TextInputType.number,
+                                decoration: InputDecoration(
+                                  hintText: 'Qty',
+                                ),
+                                onChanged: (v) {
+                                  quantities[product.id] = int.tryParse(v) ?? 0;
+                                },
+                              ),
+                            ),
+                            SizedBox(width: 8), // Spacing between Qty and measure
+                            Text(widget.category.measure), // Display the measure unit
+                          ],
                         ),
                       ),
                     );

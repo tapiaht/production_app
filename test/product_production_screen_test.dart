@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 import 'package:production_app/models/category.dart';
 import 'package:production_app/models/employee.dart';
 import 'package:production_app/models/product.dart';
+import 'package:production_app/models/production.dart'; // Import Production model
 import 'package:production_app/providers/category_provider.dart';
 import 'package:production_app/providers/employee_provider.dart';
 import 'package:production_app/providers/product_provider.dart';
@@ -16,6 +17,11 @@ import 'package:production_app/ui/screens/product_production_screen.dart';
 // Not strictly necessary to extend, but shows it's a stand-in
 class FakeSheetsService extends SheetsService {
   FakeSheetsService() : super(); // Corrected constructor
+
+  @override
+  String generateUniqueId() {
+    return 'fake-uuid-${DateTime.now().microsecondsSinceEpoch}';
+  }
 }
 
 class FakeEmployeeProvider extends EmployeeProvider {
@@ -30,7 +36,9 @@ class FakeEmployeeProvider extends EmployeeProvider {
   Employee? getEmployeeById(String id) => _employeeById;
 
   @override
-  Future<void> loadEmployees() async { /* do nothing for this test */ }
+  Future<void> loadEmployees() async {
+    /* do nothing for this test */
+  }
 }
 
 class FakeCategoryProvider extends CategoryProvider {
@@ -41,6 +49,7 @@ class FakeCategoryProvider extends CategoryProvider {
   void setCategories(List<Category> categories) {
     _categories = categories;
   }
+
   @override
   List<Category> get categories => _categories;
   @override
@@ -82,7 +91,7 @@ class FakeProductProvider extends ProductProvider {
 
 class FakeProductionProvider extends ProductionProvider {
   int _productionCount = 0;
-  Map<String, int> _productionRecords = {};
+  List<Production> _productionRecords = []; // Changed to List<Production>
   bool _loading = false;
 
   FakeProductionProvider() : super(FakeSheetsService());
@@ -91,28 +100,50 @@ class FakeProductionProvider extends ProductionProvider {
     _productionCount = count;
   }
 
-  void setProductionRecords(Map<String, int> records) {
+  void setProductionRecords(List<Production> records) {
+    // Changed to List<Production>
     _productionRecords = records;
   }
 
   @override
   int get productionCount => _productionCount;
   @override
-  Map<String, int> get productionRecords => _productionRecords;
+  List<Production> get productionRecords => _productionRecords; // Changed getter
   @override
   bool get loading => _loading;
 
-  @override
-  Future<void> saveProduction(String employeeId, Map<String, int> quantities) async {
-    _loading = true;
-    notifyListeners();
-    await Future.delayed(Duration(milliseconds: 10)); // Simulate async
-    _loading = false;
-    // Update internal state as if saved
-    _productionRecords.addAll(quantities);
-    _productionCount = _productionRecords.length; // Simplified
-    notifyListeners();
-  }
+  // @override
+  // Future<void> saveProduction(String employeeId, Map<String, int> quantities) async {
+  //   _loading = true;
+  //   notifyListeners();
+  //   await Future.delayed(Duration(milliseconds: 10)); // Simulate async
+  //   _loading = false;
+  //   // For simplicity in test, assume new production objects are created or updated
+  //   quantities.forEach((productId, quantity) {
+  //     final existingIndex = _productionRecords.indexWhere((p) => p.productId == productId);
+  //     if (existingIndex != -1) {
+  //       // Update existing record (simplified, productionId would be consistent)
+  //       _productionRecords[existingIndex] = Production(
+  //         productionId: _productionRecords[existingIndex].productionId,
+  //         date: today(),
+  //         employeeId: employeeId,
+  //         productId: productId,
+  //         quantity: quantity,
+  //       );
+  //     } else {
+  //       // Add new record (simplified, productionId generated here)
+  //       _productionRecords.add(Production(
+  //         productionId: service.generateUniqueId(), // Using service to generate ID
+  //         date: today(),
+  //         employeeId: employeeId,
+  //         productId: productId,
+  //         quantity: quantity,
+  //       ));
+  //     }
+  //   });
+  //   _productionCount = _productionRecords.length; // Update count
+  //   notifyListeners();
+  // }
 
   @override
   Future<void> getTodaysProductionCount(String employeeId) async {
@@ -133,7 +164,6 @@ class FakeProductionProvider extends ProductionProvider {
   }
 }
 
-
 void main() {
   group('ProductProductionScreen', () {
     late FakeCategoryProvider fakeCategoryProvider;
@@ -142,10 +172,27 @@ void main() {
     late FakeProductionProvider fakeProductionProvider;
 
     final tEmployee = Employee(id: 'marcos', name: 'Marcos', password: '123');
-    final tCategoryVerduras = Category(id: 'verduras', name: 'Verduras');
-    final tCategorySalsas = Category(id: 'salsas', name: 'Salsas');
-    final tProductSalteado = Product(id: 'salteado', categoryId: 'verduras', name: 'Salteado');
-    final tProductTomatada = Product(id: 'tomatada', categoryId: 'salsas', name: 'Tomatada');
+    // Added 'measure' parameter to Category constructors
+    final tCategoryVerduras = Category(
+      id: 'verduras',
+      name: 'Verduras',
+      measure: 'Kg',
+    );
+    final tCategorySalsas = Category(
+      id: 'salsas',
+      name: 'Salsas',
+      measure: 'Unit',
+    );
+    final tProductSalteado = Product(
+      id: 'salteado',
+      categoryId: 'verduras',
+      name: 'Salteado',
+    );
+    final tProductTomatada = Product(
+      id: 'tomatada',
+      categoryId: 'salsas',
+      name: 'Tomatada',
+    );
 
     setUp(() {
       fakeCategoryProvider = FakeCategoryProvider();
@@ -156,7 +203,7 @@ void main() {
       fakeEmployeeProvider.setEmployeeById(tEmployee);
       fakeCategoryProvider.setCategories([]); // Default empty
       fakeProductProvider.setProducts([]); // Default empty
-      fakeProductionProvider.setProductionRecords({}); // Default empty
+      fakeProductionProvider.setProductionRecords([]); // Default empty
       fakeProductionProvider.setProductionCount(0); // Default zero
     });
 
@@ -166,10 +213,18 @@ void main() {
     }) {
       return MultiProvider(
         providers: [
-          ChangeNotifierProvider<CategoryProvider>(create: (_) => fakeCategoryProvider),
-          ChangeNotifierProvider<EmployeeProvider>(create: (_) => fakeEmployeeProvider),
-          ChangeNotifierProvider<ProductProvider>(create: (_) => fakeProductProvider),
-          ChangeNotifierProvider<ProductionProvider>(create: (_) => fakeProductionProvider),
+          ChangeNotifierProvider<CategoryProvider>(
+            create: (_) => fakeCategoryProvider,
+          ),
+          ChangeNotifierProvider<EmployeeProvider>(
+            create: (_) => fakeEmployeeProvider,
+          ),
+          ChangeNotifierProvider<ProductProvider>(
+            create: (_) => fakeProductProvider,
+          ),
+          ChangeNotifierProvider<ProductionProvider>(
+            create: (_) => fakeProductionProvider,
+          ),
         ],
         child: MaterialApp(
           home: ProductProductionScreen(employee: employee, category: category),
@@ -177,30 +232,46 @@ void main() {
       );
     }
 
-    testWidgets('loads and displays product quantities for Verduras (Salteado 8)', (tester) async {
+    testWidgets('loads and displays product quantities for Verduras (Salteado 8)', (
+      tester,
+    ) async {
       final productsVerduras = [tProductSalteado];
-      final productionRecordsVerduras = {tProductSalteado.id: 8};
+      // Changed to List<Production>
+      final productionRecordsVerduras = [
+        Production(
+          productionId: 'prod1',
+          date: today(),
+          employeeId: tEmployee.id,
+          productId: tProductSalteado.id,
+          quantity: 8,
+        ),
+      ];
 
       fakeProductProvider.setProducts(productsVerduras);
       fakeProductionProvider.setProductionRecords(productionRecordsVerduras);
 
-      await tester.pumpWidget(createProductProductionScreen(
-        employee: tEmployee,
-        category: tCategoryVerduras,
-      ));
+      await tester.pumpWidget(
+        createProductProductionScreen(
+          employee: tEmployee,
+          category: tCategoryVerduras,
+        ),
+      );
 
       // Wait for initializations and data loading
       await tester.pumpAndSettle();
 
       // Verify StatusBar
       expect(find.text('Employee: Marcos'), findsOneWidget);
-      expect(find.text('Today\'s Records: 0'), findsOneWidget); 
+      expect(
+        find.text('Today\'s Records: 1'),
+        findsOneWidget,
+      ); // Expect 1 record now
 
       // Verify product list and quantities
       expect(find.text('Salteado'), findsOneWidget);
       final salteadoTextField = find.widgetWithText(TextField, '8');
       expect(salteadoTextField, findsOneWidget);
-      
+
       final TextField salteadoInput = tester.widget(salteadoTextField);
       expect(salteadoInput.controller!.text, '8');
 
@@ -209,49 +280,68 @@ void main() {
       // verify(mockProductProvider.loadProducts(tCategoryVerduras.id)).called(1); // Not using mockito
     });
 
-    testWidgets('loads and displays product quantities for Salsas (Tomatada 2)', (tester) async {
-      final productsSalsas = [tProductTomatada];
-      final productionRecordsSalsas = {tProductTomatada.id: 2};
+    testWidgets(
+      'loads and displays product quantities for Salsas (Tomatada 2)',
+      (tester) async {
+        final productsSalsas = [tProductTomatada];
+        // Changed to List<Production>
+        final productionRecordsSalsas = [
+          Production(
+            productionId: 'prod2',
+            date: today(),
+            employeeId: tEmployee.id,
+            productId: tProductTomatada.id,
+            quantity: 2,
+          ),
+        ];
 
-      fakeProductProvider.setProducts(productsSalsas);
-      fakeProductionProvider.setProductionRecords(productionRecordsSalsas);
+        fakeProductProvider.setProducts(productsSalsas);
+        fakeProductionProvider.setProductionRecords(productionRecordsSalsas);
 
-      await tester.pumpWidget(createProductProductionScreen(
-        employee: tEmployee,
-        category: tCategorySalsas,
-      ));
+        await tester.pumpWidget(
+          createProductProductionScreen(
+            employee: tEmployee,
+            category: tCategorySalsas,
+          ),
+        );
 
-      await tester.pumpAndSettle();
+        await tester.pumpAndSettle();
 
-      expect(find.text('Employee: Marcos'), findsOneWidget);
-      expect(find.text('Today\'s Records: 0'), findsOneWidget);
+        expect(find.text('Employee: Marcos'), findsOneWidget);
+        expect(
+          find.text('Today\'s Records: 1'),
+          findsOneWidget,
+        ); // Expect 1 record now
 
-      expect(find.text('Tomatada'), findsOneWidget);
-      final tomatadaTextField = find.widgetWithText(TextField, '2');
-      expect(tomatadaTextField, findsOneWidget);
+        expect(find.text('Tomatada'), findsOneWidget);
+        final tomatadaTextField = find.widgetWithText(TextField, '2');
+        expect(tomatadaTextField, findsOneWidget);
 
-      final TextField tomatadaInput = tester.widget(tomatadaTextField);
-      expect(tomatadaInput.controller!.text, '2');
-    });
+        final TextField tomatadaInput = tester.widget(tomatadaTextField);
+        expect(tomatadaInput.controller!.text, '2');
+      },
+    );
 
     testWidgets('TextField shows Qty when no previous record', (tester) async {
-      final productsVerduras = [tProductSalteado]; 
+      final productsVerduras = [tProductSalteado];
 
       fakeProductProvider.setProducts(productsVerduras);
-      fakeProductionProvider.setProductionRecords({});
+      fakeProductionProvider.setProductionRecords([]); // No production records
 
-      await tester.pumpWidget(createProductProductionScreen(
-        employee: tEmployee,
-        category: tCategoryVerduras,
-      ));
+      await tester.pumpWidget(
+        createProductProductionScreen(
+          employee: tEmployee,
+          category: tCategoryVerduras,
+        ),
+      );
 
       await tester.pumpAndSettle();
 
       expect(find.text('Salteado'), findsOneWidget);
       expect(find.widgetWithText(TextField, 'Qty'), findsOneWidget);
-      
+
       final TextField salteadoInput = tester.widget(find.byType(TextField));
-      expect(salteadoInput.controller!.text, ''); 
+      expect(salteadoInput.controller!.text, '');
     });
   });
 }

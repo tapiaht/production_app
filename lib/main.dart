@@ -8,6 +8,7 @@ import 'package:production_app/services/sheets_service.dart';
 import 'package:production_app/ui/screens/employee_login_screen.dart';
 
 void main() {
+  print('App started with enhanced logging version 2.'); // Added for debugging
   runApp(MyApp());
 }
 
